@@ -153,6 +153,17 @@
       ? params.get('signal').split(',')
       : ['wss://signaling.yjs.dev'];
 
+    /* ICE servers: STUN + a free public TURN relay so two people on DIFFERENT
+       networks (different wifi / mobile data) can actually connect. TURN is the
+       relay that gets through firewalls and strict routers.                     */
+    const ICE = { iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:openrelay.metered.ca:80' },
+      { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+    ]};
+
     /* ----- room: taken from the URL hash so the link is the shared board ----- */
     let room = location.hash.slice(1);
     const isNewBoard = !room;
@@ -164,7 +175,7 @@
     /* ----- Yjs document + persistence + P2P sync ----- */
     const ydoc = new Y.Doc();
     const idb = new IndexeddbPersistence('tierlist-' + room, ydoc);
-    const provider = new WebrtcProvider(room, ydoc, { signaling: SIGNALING });
+    const provider = new WebrtcProvider(room, ydoc, { signaling: SIGNALING, peerOpts: { config: ICE } });
 
     const yTiers = ydoc.getArray('tiers');   // [ Y.Map{id,name,color} ] order = tier order
     const yItems = ydoc.getMap('items');     // id -> Y.Map{text,tier,order}
@@ -416,7 +427,7 @@
     }
     provider.awareness.on('change', updateStatus);
     setInterval(updateStatus, 1500);
-    setTimeout(()=>{ if(!signalingUp()){ dot.className='dot off'; statusText.textContent='Sync server unreachable'; } }, 9000);
+    setTimeout(()=>{ if(!signalingUp()){ dot.className='dot off'; statusText.textContent='Can’t reach sync server — turn off VPN & reload'; } }, 9000);
 
     /* ----- seed defaults for a brand-new board only ----- */
     idb.whenSynced.then(()=>{
